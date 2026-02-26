@@ -584,7 +584,7 @@ export default function PatientApp({ session }) {
   useEffect(() => { loadData() }, [loadData])
 
   async function handleSaveEntry(data) {
-    const { error } = await supabase.from('daily_entries').insert({
+    const insertData = {
       patient_id: patient.id,
       mood: data.mood,
       craving_level: data.craving_level,
@@ -592,8 +592,19 @@ export default function PatientApp({ session }) {
       emotion_word: data.emotion_word,
       negotiation: data.negotiation,
       notes: data.notes
-    })
-    if (!error) loadData()
+    }
+    const { error } = await supabase.from('daily_entries').insert(insertData)
+    if (!error) {
+      loadData()
+      // Trigger alert check (fire and forget)
+      try {
+        fetch('/.netlify/functions/check-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ record: insertData })
+        })
+      } catch (e) { /* silent */ }
+    }
   }
 
   async function handleToggleTask(taskId, newStatus) {
