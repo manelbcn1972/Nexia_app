@@ -15,6 +15,34 @@ export const MOODS = [
   { id: 'muy_bien', emoji: '😊', label: 'Muy bien', value: 5 }
 ]
 
+export const EMOTIONS = [
+  { id: 'rabia', label: 'Rabia', emoji: '😤' },
+  { id: 'ansiedad', label: 'Ansiedad', emoji: '😰' },
+  { id: 'calma', label: 'Calma', emoji: '😌' },
+  { id: 'culpa', label: 'Culpa', emoji: '😔' },
+  { id: 'vacio', label: 'Vacío', emoji: '🫥' },
+  { id: 'tristeza', label: 'Tristeza', emoji: '😢' },
+  { id: 'miedo', label: 'Miedo', emoji: '😨' },
+  { id: 'esperanza', label: 'Esperanza', emoji: '🌱' },
+  { id: 'frustracion', label: 'Frustración', emoji: '😩' },
+  { id: 'verguenza', label: 'Vergüenza', emoji: '🫣' },
+  { id: 'alivio', label: 'Alivio', emoji: '😮‍💨' },
+  { id: 'soledad', label: 'Soledad', emoji: '🧍' },
+  { id: 'gratitud', label: 'Gratitud', emoji: '🙏' },
+  { id: 'confusion', label: 'Confusión', emoji: '😵‍💫' }
+]
+
+export const NEGOTIATION_EXAMPLES = [
+  'saltarme la rutina',
+  'que una copa no pasa nada',
+  'no necesito llamar a nadie',
+  'puedo controlarlo esta vez',
+  'hoy no es tan grave',
+  'merezco un descanso de todo',
+  'nadie se va a enterar',
+  'solo por esta vez'
+]
+
 export const TASK_TYPES = [
   { id: 'emocional', label: 'Emocional', color: '#ec4899' },
   { id: 'conductual', label: 'Conductual', color: '#f97316' },
