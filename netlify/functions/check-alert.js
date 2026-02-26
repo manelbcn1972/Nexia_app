@@ -214,6 +214,12 @@ export async function handler(event) {
 
     // ============ SEND EMAIL ============
     if (RESEND_KEY) {
+      // Build recipients list: therapist + supervisor CC
+      const ccEmails = process.env.ALERT_CC_EMAILS
+        ? process.env.ALERT_CC_EMAILS.split(',').map(e => e.trim()).filter(Boolean)
+        : []
+      const allRecipients = [therapistEmail, ...ccEmails]
+
       const emailRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -222,14 +228,14 @@ export async function handler(event) {
         },
         body: JSON.stringify({
           from: ALERT_FROM,
-          to: therapistEmail,
+          to: allRecipients,
           subject: emailSubject,
           html: emailHtml
         })
       })
 
       const emailResult = await emailRes.json()
-      console.log(`Alert email sent to ${therapistEmail}:`, emailResult)
+      console.log(`Alert email sent to ${allRecipients.join(', ')}:`, emailResult)
     } else {
       console.log('RESEND_API_KEY not configured — alert would have been:', emailSubject)
       console.log('Alerts:', JSON.stringify(alerts))
