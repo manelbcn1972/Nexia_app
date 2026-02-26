@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../utils/supabase'
-import { PHASES, MOODS, TASK_TYPES, formatDate, formatDateTime, getCravingColor } from '../utils/constants'
+import { PHASES, MOODS, EMOTIONS, TASK_TYPES, formatDate, formatDateTime, getCravingColor } from '../utils/constants'
 import { IconUsers, IconPlus, IconX, IconEdit, IconTrash, IconChart, IconTasks, IconAlert, IconLogout, IconMenu, IconCheck, IconPhone } from '../components/Icons'
 
 // ==================== ADD PATIENT MODAL ====================
@@ -428,6 +428,10 @@ function PatientDetail({ patient, onBack, onRefresh }) {
   const avgCraving = last7Entries.length > 0
     ? (last7Entries.reduce((sum, e) => sum + e.craving_level, 0) / last7Entries.length).toFixed(1)
     : '-'
+  const avgAnimo = last7Entries.length > 0
+    ? (last7Entries.reduce((sum, e) => sum + (e.mood_score || 0), 0) / last7Entries.length).toFixed(1)
+    : '-'
+  const hasNegotiation = last7Entries.filter(e => e.negotiation && e.negotiation !== '(sin negociación detectada)').length
   const pendingTasks = tasks.filter(t => t.status === 'pending').length
   const completedTasks = tasks.filter(t => t.status === 'completed').length
   const taskRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0
@@ -476,22 +480,26 @@ function PatientDetail({ patient, onBack, onRefresh }) {
       )}
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 24 }}>
         <div className="stat-card">
           <div className="stat-value" style={{ color: getCravingColor(parseFloat(avgCraving) || 0) }}>{avgCraving}</div>
-          <div className="stat-label">Craving medio (7d)</div>
+          <div className="stat-label">Craving (7d)</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: parseFloat(avgAnimo) <= 3 ? 'var(--danger)' : parseFloat(avgAnimo) <= 6 ? 'var(--warning)' : 'var(--success)' }}>{avgAnimo}</div>
+          <div className="stat-label">Ánimo (7d)</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: hasNegotiation > 3 ? 'var(--danger)' : hasNegotiation > 0 ? 'var(--warning)' : 'var(--success)' }}>{hasNegotiation}/{last7Entries.length}</div>
+          <div className="stat-label">Negociaciones</div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{last7Entries.length}/7</div>
-          <div className="stat-label">Registros semana</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{pendingTasks}</div>
-          <div className="stat-label">Tareas pendientes</div>
+          <div className="stat-label">Check-ins</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: taskRate >= 70 ? 'var(--success)' : taskRate >= 40 ? 'var(--warning)' : 'var(--danger)' }}>{taskRate}%</div>
-          <div className="stat-label">Cumplimiento</div>
+          <div className="stat-label">Tareas</div>
         </div>
       </div>
 
@@ -501,27 +509,52 @@ function PatientDetail({ patient, onBack, onRefresh }) {
           {/* Entries */}
           <div className="card">
             <div className="card-header">
-              <span className="card-title">Registros diarios</span>
+              <span className="card-title">Check-ins (E/A/C/N)</span>
             </div>
             {entries.length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: 20 }}>Sin registros aún</div>
             ) : (
-              <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                {entries.slice(0, 14).map((entry, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '8px 0', borderBottom: '1px solid var(--border)'
-                  }}>
-                    <span style={{ fontSize: 20 }}>{MOODS.find(m => m.id === entry.mood)?.emoji || '❓'}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13 }}>
-                        <strong>Craving: {entry.craving_level}/10</strong>
-                        {entry.notes && <span style={{ color: 'var(--text-muted)' }}> — {entry.notes.substring(0, 60)}</span>}
+              <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                {entries.slice(0, 14).map((entry, i) => {
+                  const emo = EMOTIONS.find(e => e.id === entry.emotion_word)
+                  const isAlert = entry.craving_level >= 7 || (entry.negotiation && entry.negotiation !== '(sin negociación detectada)')
+                  return (
+                    <div key={i} style={{
+                      padding: '10px 0', borderBottom: '1px solid var(--border)',
+                      borderLeft: isAlert ? '3px solid var(--danger)' : '3px solid transparent',
+                      paddingLeft: 10
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 18 }}>{emo?.emoji || MOODS.find(m => m.id === entry.mood)?.emoji || '📝'}</span>
+                          <span style={{ fontSize: 14, fontWeight: 600 }}>
+                            {emo?.label || entry.emotion_word || MOODS.find(m => m.id === entry.mood)?.label || '—'}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatDate(entry.created_at)}</span>
                       </div>
+                      <div style={{ display: 'flex', gap: 16, fontSize: 12, marginBottom: 4 }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          <strong>A:</strong> {entry.mood_score ?? '—'}/10
+                        </span>
+                        <span style={{ color: getCravingColor(entry.craving_level), fontWeight: entry.craving_level >= 7 ? 700 : 400 }}>
+                          <strong>C:</strong> {entry.craving_level}/10
+                          {entry.craving_level >= 7 && ' ⚠️'}
+                        </span>
+                      </div>
+                      {entry.negotiation && entry.negotiation !== '(sin negociación detectada)' && (
+                        <div style={{ fontSize: 12, color: '#f59e0b', fontStyle: 'italic', marginTop: 2 }}>
+                          <strong>N:</strong> "{entry.negotiation}"
+                        </div>
+                      )}
+                      {entry.notes && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                          {entry.notes.substring(0, 80)}
+                        </div>
+                      )}
                     </div>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatDate(entry.created_at)}</span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -674,7 +707,7 @@ export default function TherapistApp({ session }) {
             <IconPlus style={{ width: 14, height: 14 }} /> Nuevo paciente
           </button>
           <button className="btn btn-block btn-sm" onClick={() => {
-            const msg = encodeURIComponent('🔔 Recordatorio diario\n\nHola equipo, recordad registrar vuestro estado de hoy en Nexia.\n\n📱 Abrir Nexia: https://nexia-adicciones.netlify.app\n\nRegistrad:\n✅ Estado de ánimo\n✅ Nivel de craving\n✅ Tareas completadas\n\n¡Cada registro cuenta en vuestro progreso! 💪')
+            const msg = encodeURIComponent('🕊️ Recordatorio diario\n\nHola equipo, recordad hacer vuestro check-in E/A/C/N en Nexia.\n\n📱 Abrir Nexia: https://nexia-adicciones.netlify.app\n\nE — Emoción predominante\nA — Ánimo (0-10)\nC — Craving (0-10)\nN — Negociación\n\n2 minutos que marcan la diferencia 💪')
             window.open('https://web.whatsapp.com/send?text=' + msg, '_blank')
           }} style={{ marginTop: 8, background: '#25D366', border: 'none', color: 'white' }}>
             📱 Recordatorio grupo
