@@ -97,7 +97,7 @@ export async function handler(event) {
     // Rule 1: High craving (≥7)
     if (craving >= 7) {
       alerts.push({
-        level: craving >= 9 ? '🔴 CRÍTICO' : '🟠 ALTO',
+        level: craving >= 9 ? '🔴 CRÍTICO!!' : '🟠 ALTO',
         rule: 'Craving elevado',
         detail: `Nivel de craving: ${craving}/10`
       })
