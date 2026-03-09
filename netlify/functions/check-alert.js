@@ -20,7 +20,7 @@ export async function handler(event) {
     const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
     const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY
     const RESEND_KEY = process.env.RESEND_API_KEY
-    const ALERT_FROM = process.env.ALERT_FROM_EMAIL || 'alertas@nexia.coach'
+    const ALERT_FROM = process.env.ALERT_FROM_EMAIL || 'onboarding@resend.dev'
 
     if (!SUPABASE_URL || !SUPABASE_KEY) {
       console.error('Missing Supabase credentials')
