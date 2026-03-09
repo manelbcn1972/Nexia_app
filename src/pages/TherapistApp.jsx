@@ -359,6 +359,13 @@ function PatientDetail({ patient, onBack, onRefresh }) {
   const [notes, setNotes] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [clinicalNotes, setClinicalNotes] = useState([])
+  // Attendance
+  const [attendance, setAttendance] = useState([])
+  const [todayAttendance, setTodayAttendance] = useState(null)
+  const [attRating, setAttRating] = useState(5)
+  const [attEmotion, setAttEmotion] = useState('')
+  const [attNote, setAttNote] = useState('')
+  const [savingAtt, setSavingAtt] = useState(false)
 
   const phase = PHASES[patient.current_phase || 0]
 
@@ -391,6 +398,23 @@ function PatientDetail({ patient, onBack, onRefresh }) {
       .order('created_at', { ascending: false })
       .limit(20)
     setClinicalNotes(cn || [])
+
+    // Load attendance
+    const { data: att } = await supabase
+      .from('session_attendance')
+      .select('*')
+      .eq('patient_id', patient.id)
+      .order('session_date', { ascending: false })
+      .limit(30)
+    setAttendance(att || [])
+    const today = new Date().toISOString().split('T')[0]
+    const todayAtt = (att || []).find(a => a.session_date === today)
+    setTodayAttendance(todayAtt || null)
+    if (todayAtt) {
+      setAttRating(todayAtt.therapist_rating || 5)
+      setAttEmotion(todayAtt.observed_emotion || '')
+      setAttNote(todayAtt.therapist_note || '')
+    }
   }, [patient.id])
 
   useEffect(() => { loadPatientData() }, [loadPatientData])
@@ -415,6 +439,26 @@ function PatientDetail({ patient, onBack, onRefresh }) {
     })
     setNotes('')
     setSavingNote(false)
+    loadPatientData()
+  }
+
+  async function handleSaveAttendance(attended) {
+    setSavingAtt(true)
+    const today = new Date().toISOString().split('T')[0]
+    const record = {
+      patient_id: patient.id,
+      session_date: today,
+      attended,
+      therapist_rating: attended ? attRating : null,
+      observed_emotion: attended ? attEmotion : null,
+      therapist_note: attNote || null
+    }
+    if (todayAttendance) {
+      await supabase.from('session_attendance').update(record).eq('id', todayAttendance.id)
+    } else {
+      await supabase.from('session_attendance').insert(record)
+    }
+    setSavingAtt(false)
     loadPatientData()
   }
 
@@ -641,6 +685,119 @@ function PatientDetail({ patient, onBack, onRefresh }) {
               ))}
             </div>
           )}
+
+          {/* Attendance Panel */}
+          <div className="card" style={{ marginTop: 12 }}>
+            <div className="card-title" style={{ marginBottom: 12 }}>Asistencia de hoy</div>
+            {todayAttendance ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <span style={{
+                    fontSize: 13, fontWeight: 600, padding: '4px 10px', borderRadius: 6,
+                    background: todayAttendance.attended ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                    color: todayAttendance.attended ? 'var(--success)' : 'var(--danger)'
+                  }}>
+                    {todayAttendance.attended ? '✓ Asistió' : '✗ No asistió'}
+                  </span>
+                  {todayAttendance.therapist_rating && (
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                      Valoración: <strong>{todayAttendance.therapist_rating}/10</strong>
+                    </span>
+                  )}
+                </div>
+                {todayAttendance.observed_emotion && (
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    Estado observado: <strong>{todayAttendance.observed_emotion}</strong>
+                  </div>
+                )}
+                {todayAttendance.therapist_note && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    "{todayAttendance.therapist_note}"
+                  </div>
+                )}
+                <button className="btn btn-ghost btn-sm" style={{ marginTop: 8, fontSize: 11 }}
+                  onClick={() => setTodayAttendance({ ...todayAttendance, _editing: true })}>
+                  Modificar
+                </button>
+              </div>
+            ) : null}
+
+            {(!todayAttendance || todayAttendance._editing) && (
+              <div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <button className="btn btn-sm" onClick={() => handleSaveAttendance(true)} disabled={savingAtt}
+                    style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid var(--success)', flex: 1 }}>
+                    ✓ Asistió
+                  </button>
+                  <button className="btn btn-sm" onClick={() => handleSaveAttendance(false)} disabled={savingAtt}
+                    style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--danger)', border: '1px solid var(--danger)', flex: 1 }}>
+                    ✗ No asistió
+                  </button>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <div className="label" style={{ fontSize: 11, marginBottom: 4 }}>Valoración del terapeuta: {attRating}/10</div>
+                  <input type="range" min="0" max="10" value={attRating} onChange={e => setAttRating(parseInt(e.target.value))}
+                    style={{ width: '100%', accentColor: attRating <= 3 ? '#ef4444' : attRating <= 6 ? '#f59e0b' : '#22c55e' }} />
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <div className="label" style={{ fontSize: 11, marginBottom: 4 }}>Estado emocional observado</div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {EMOTIONS.map(em => (
+                      <button key={em.id} onClick={() => setAttEmotion(attEmotion === em.id ? '' : em.id)}
+                        className="btn btn-sm" style={{
+                          fontSize: 11, padding: '2px 8px',
+                          background: attEmotion === em.id ? 'var(--accent)' : 'var(--bg-input)',
+                          color: attEmotion === em.id ? 'white' : 'var(--text-secondary)',
+                          border: 'none'
+                        }}>
+                        {em.emoji} {em.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="label" style={{ fontSize: 11, marginBottom: 4 }}>Nota breve</div>
+                  <input type="text" className="input" value={attNote} onChange={e => setAttNote(e.target.value)}
+                    placeholder="Observaciones de la sesión..." style={{ fontSize: 12 }} />
+                </div>
+              </div>
+            )}
+
+            {/* Recent attendance history */}
+            {attendance.length > 0 && (
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                <div className="label" style={{ fontSize: 11, marginBottom: 8 }}>Últimas sesiones</div>
+                <div style={{ maxHeight: 150, overflowY: 'auto' }}>
+                  {attendance.slice(0, 10).map((a, i) => {
+                    const emo = EMOTIONS.find(e => e.id === a.observed_emotion)
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0',
+                        borderBottom: '1px solid var(--border)', fontSize: 12
+                      }}>
+                        <span style={{ color: a.attended ? 'var(--success)' : 'var(--danger)', fontWeight: 600, width: 16 }}>
+                          {a.attended ? '✓' : '✗'}
+                        </span>
+                        <span style={{ color: 'var(--text-muted)', width: 65 }}>{a.session_date}</span>
+                        {a.therapist_rating && (
+                          <span style={{ color: 'var(--text-secondary)' }}>{a.therapist_rating}/10</span>
+                        )}
+                        {emo && <span>{emo.emoji}</span>}
+                        {a.therapist_note && (
+                          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {a.therapist_note}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
