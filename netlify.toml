@@ -5,6 +5,9 @@
 [functions]
   directory = "netlify/functions"
 
+[functions."check-reminder"]
+  schedule = "0 17 * * *"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
