@@ -366,6 +366,11 @@ function PatientDetail({ patient, onBack, onRefresh }) {
   const [attEmotion, setAttEmotion] = useState('')
   const [attNote, setAttNote] = useState('')
   const [savingAtt, setSavingAtt] = useState(false)
+  // AI Summary
+  const [aiSummary, setAiSummary] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiPeriod, setAiPeriod] = useState(7)
+  const [showAiPanel, setShowAiPanel] = useState(false)
 
   const phase = PHASES[patient.current_phase || 0]
 
@@ -462,6 +467,28 @@ function PatientDetail({ patient, onBack, onRefresh }) {
     loadPatientData()
   }
 
+  async function handleAiSummary() {
+    setAiLoading(true)
+    setShowAiPanel(true)
+    setAiSummary(null)
+    try {
+      const res = await fetch('https://cjitydjdrktvbciwapvl.supabase.co/functions/v1/ai-patient-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patient_id: patient.id, period_days: aiPeriod })
+      })
+      const data = await res.json()
+      if (data.error) {
+        setAiSummary({ error: data.error })
+      } else {
+        setAiSummary(data)
+      }
+    } catch (err) {
+      setAiSummary({ error: 'Error de conexión' })
+    }
+    setAiLoading(false)
+  }
+
   // Stats
   const last7Entries = entries.filter(e => {
     const d = new Date(e.created_at)
@@ -492,6 +519,10 @@ function PatientDetail({ patient, onBack, onRefresh }) {
         <button className="btn btn-ghost btn-sm" onClick={() => setShowEditPatient(true)} title="Editar paciente">
           <IconEdit style={{ width: 16, height: 16 }} /> Editar
         </button>
+        <button className="btn btn-sm" onClick={handleAiSummary} disabled={aiLoading}
+          style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', border: 'none', fontWeight: 600 }}>
+          {aiLoading ? '⏳ Analizando...' : '🤖 Evaluación IA'}
+        </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="phase-badge" style={{ background: phase.color }}>{phase.name}</span>
           <button className="btn btn-ghost btn-sm" onClick={() => { setEditPhase(true); setNewPhase(patient.current_phase) }}>
@@ -520,6 +551,75 @@ function PatientDetail({ patient, onBack, onRefresh }) {
             <button className="btn btn-primary btn-sm" onClick={handlePhaseChange}>Guardar</button>
             <button className="btn btn-ghost btn-sm" onClick={() => setEditPhase(false)}>Cancelar</button>
           </div>
+        </div>
+      )}
+
+      {/* AI Summary Panel */}
+      {showAiPanel && (
+        <div className="card" style={{ marginBottom: 16, borderColor: '#6366f1', borderWidth: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🤖</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#a78bfa' }}>Evaluación IA — {patient.name}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <select value={aiPeriod} onChange={e => setAiPeriod(parseInt(e.target.value))}
+                style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', fontSize: 12 }}>
+                <option value={7}>Última semana</option>
+                <option value={14}>Últimas 2 semanas</option>
+                <option value={30}>Último mes</option>
+                <option value={90}>Últimos 3 meses</option>
+              </select>
+              <button className="btn btn-sm" onClick={handleAiSummary} disabled={aiLoading}
+                style={{ background: '#6366f1', color: 'white', border: 'none', fontSize: 11 }}>
+                {aiLoading ? '⏳' : '🔄'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowAiPanel(false)} style={{ fontSize: 16, padding: '2px 6px' }}>✕</button>
+            </div>
+          </div>
+
+          {aiLoading && (
+            <div style={{ textAlign: 'center', padding: 40 }}>
+              <div style={{ fontSize: 32, marginBottom: 12, animation: 'pulse 1.5s infinite' }}>🧠</div>
+              <div style={{ color: '#a78bfa', fontSize: 14 }}>Analizando datos de {patient.name}...</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Periodo: {aiPeriod} días</div>
+            </div>
+          )}
+
+          {aiSummary && aiSummary.error && (
+            <div style={{ color: 'var(--danger)', padding: 16, textAlign: 'center' }}>
+              Error: {aiSummary.error}
+            </div>
+          )}
+
+          {aiSummary && aiSummary.analysis && (
+            <div>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                <div style={{ background: 'var(--bg-input)', padding: '8px 12px', borderRadius: 8, fontSize: 12 }}>
+                  📊 <strong>{aiSummary.checkins}</strong> check-ins
+                </div>
+                <div style={{ background: 'var(--bg-input)', padding: '8px 12px', borderRadius: 8, fontSize: 12 }}>
+                  🔥 Craving: <strong>{aiSummary.avg_craving}</strong>/10
+                </div>
+                <div style={{ background: 'var(--bg-input)', padding: '8px 12px', borderRadius: 8, fontSize: 12 }}>
+                  💚 Ánimo: <strong>{aiSummary.avg_animo}</strong>/10
+                </div>
+              </div>
+              <div style={{
+                fontSize: 13, lineHeight: 1.7, color: 'var(--text-secondary)',
+                whiteSpace: 'pre-wrap', maxHeight: 500, overflowY: 'auto',
+                padding: '0 4px'
+              }}>
+                {aiSummary.analysis
+                  .replace(/^# .+$/gm, '')
+                  .replace(/^## (\d+\. .+)$/gm, '\n━━━ $1 ━━━')
+                  .replace(/\*\*(.+?)\*\*/g, '$1')
+                  .replace(/^- /gm, '  → ')
+                  .replace(/⚠️/g, '⚠️ ')
+                  .trim()}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
