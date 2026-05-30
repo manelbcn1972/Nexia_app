@@ -435,6 +435,18 @@ function PatientDetail({ patient, onBack, onRefresh }) {
     loadPatientData()
   }
 
+  async function handleDeletePatient() {
+    if (!confirm(`¿Estás seguro de eliminar a ${patient.name}? Se borrarán todos sus datos (check-ins, tareas, notas, asistencia). Esta acción no se puede deshacer.`)) return
+    // Delete related data first
+    await supabase.from('daily_entries').delete().eq('patient_id', patient.id)
+    await supabase.from('therapy_tasks').delete().eq('patient_id', patient.id)
+    await supabase.from('clinical_notes').delete().eq('patient_id', patient.id)
+    await supabase.from('session_attendance').delete().eq('patient_id', patient.id)
+    // Delete patient
+    await supabase.from('patients').delete().eq('id', patient.id)
+    onBack()
+  }
+
   async function handleSaveNote() {
     if (!notes.trim()) return
     setSavingNote(true)
@@ -522,6 +534,10 @@ function PatientDetail({ patient, onBack, onRefresh }) {
         <button className="btn btn-sm" onClick={handleAiSummary} disabled={aiLoading}
           style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', border: 'none', fontWeight: 600 }}>
           {aiLoading ? '⏳ Analizando...' : '🤖 Evaluación IA'}
+        </button>
+        <button className="btn btn-ghost btn-sm" onClick={handleDeletePatient}
+          style={{ color: 'var(--danger)', fontSize: 12 }} title="Eliminar paciente">
+          🗑️
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="phase-badge" style={{ background: phase.color }}>{phase.name}</span>
